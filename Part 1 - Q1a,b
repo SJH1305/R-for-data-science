@@ -1,0 +1,111 @@
+# Q1a: Metropolis-Hastings Sampler
+set.seed(1234)
+
+# Parameters
+x0 <- 0
+N <- 10000
+s <- 1
+
+# Storage
+x <- numeric(N)
+x[1] <- x0
+
+# Define log-density
+log_f <- function(x) {
+  -abs(x) + log(0.5)
+}
+
+# Sampler
+for (i in 2:N) {
+  x_star <- rnorm(1, mean = x[i-1], sd = s)
+  log_r <- log_f(x_star) - log_f(x[i-1])
+  log_u <- log(runif(1))
+  
+  if (log_u < log_r) {
+    x[i] <- x_star
+  } else {
+    x[i] <- x[i-1]
+  }
+}
+
+# Histogram and density plot
+library(ggplot2)
+
+df <- data.frame(x = x)
+
+ggplot(df, aes(x)) +
+  geom_histogram(aes(y = ..density..), bins = 50, fill = "skyblue", color = "black", alpha = 0.6) +
+  geom_density(color = "red", linewidth = 1.2) +
+  stat_function(fun = function(x) 0.5 * exp(-abs(x)), color = "blue", linewidth = 1) +
+  xlim(-10, 10) +
+  labs(title = "Histogram of Metropolis-Hastings Samples",
+       x = "x", y = "Density") +
+  theme_minimal()
+
+# Summary
+mean_x <- mean(x)
+sd_x <- sd(x)
+
+cat(sprintf("Sample mean: %.4f\n", mean_x))
+cat(sprintf("Sample standard deviation: %.4f\n", sd_x))
+
+# Q1b: Convergence Diagnostics (R-hat)
+log_f <- function(x) {
+  -abs(x) + log(0.5)
+}
+
+metropolis_hastings <- function(x0, N, s, seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+  
+  x <- numeric(N)
+  x[1] <- x0
+  
+  for (i in 2:N) {
+    x_star <- rnorm(1, mean = x[i - 1], sd = s)
+    log_r <- log_f(x_star) - log_f(x[i - 1])
+    log_u <- log(runif(1))
+    
+    if (log_u < log_r) {
+      x[i] <- x_star
+    } else {
+      x[i] <- x[i - 1]
+    }
+  }
+  
+  return(x)
+}
+
+# Parameters
+starting_points <- c(0, 1, -1, 2)
+N <- 2000
+s <- 0.001
+
+# Run multiple chains
+chains <- lapply(seq_along(starting_points), function(j) {
+  metropolis_hastings(starting_points[j], N, s, seed = 1234 + j)
+})
+
+# Chain means
+chain_means <- sapply(chains, mean)
+
+# Chain variances
+variances <- sapply(chains, function(chain) {
+  m <- mean(chain)
+  mean((chain - m)^2)
+})
+
+# Overall mean
+M <- mean(chain_means)
+
+# Between-chain variance B
+J <- length(chains)
+B <- (1 / J) * sum((chain_means - M)^2)
+
+# Within-chain variance W
+W <- mean(variances)
+
+# R-hat diagnostic
+R_hat <- sqrt((B + W) / W)
+
+# Output
+cat(sprintf("R-hat diagnostic: %.4f\n", R_hat))
